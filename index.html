@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Servo-kontroll</title>
+  <style>
+    body {
+      font-family: monospace;
+      background: #1a1a2e;
+      color: #eee;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+    }
+
+    h1 {
+      font-size: 1.8rem;
+      margin-bottom: 0.3rem;
+      color: #00d4ff;
+      letter-spacing: 2px;
+    }
+
+    p.subtitle {
+      color: #888;
+      margin-bottom: 2rem;
+      font-size: 0.85rem;
+    }
+
+    .card {
+      background: #16213e;
+      border: 1px solid #0f3460;
+      border-radius: 12px;
+      padding: 2rem;
+      width: 340px;
+    }
+
+    .servo-block {
+      margin-bottom: 1.8rem;
+    }
+
+    label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.95rem;
+      margin-bottom: 0.5rem;
+      color: #ccc;
+    }
+
+    label span {
+      color: #00d4ff;
+      font-weight: bold;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: #00d4ff;
+      cursor: pointer;
+    }
+
+    .center-btn {
+      background: none;
+      border: 1px solid #444;
+      color: #aaa;
+      padding: 0.3rem 0.8rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-family: monospace;
+      font-size: 0.8rem;
+      margin-top: 0.5rem;
+    }
+
+    .center-btn:hover {
+      border-color: #00d4ff;
+      color: #00d4ff;
+    }
+
+    .send-btn {
+      width: 100%;
+      padding: 0.8rem;
+      background: #00d4ff;
+      color: #000;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-family: monospace;
+      font-weight: bold;
+      cursor: pointer;
+      margin-top: 0.5rem;
+      letter-spacing: 1px;
+    }
+
+    .send-btn:hover { background: #00b8d9; }
+    .send-btn:active { background: #0097b2; }
+
+    #status-msg {
+      text-align: center;
+      margin-top: 1rem;
+      font-size: 0.85rem;
+      color: #888;
+      min-height: 1.2rem;
+    }
+
+    #status-msg.ok  { color: #4caf50; }
+    #status-msg.err { color: #f44336; }
+
+    .divider {
+      border: none;
+      border-top: 1px solid #0f3460;
+      margin: 1.5rem 0;
+    }
+
+    .visual {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 1.5rem;
+    }
+
+    .dot-grid {
+      position: relative;
+      width: 120px;
+      height: 120px;
+      border: 1px solid #0f3460;
+      border-radius: 50%;
+      background: #0d1b2a;
+    }
+
+    #dot {
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      background: #00d4ff;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      transition: left 0.3s, top 0.3s;
+      box-shadow: 0 0 8px #00d4ff;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>SERVO CONTROL</h1>
+  <p class="subtitle">Pan + Tilt via Raspberry Pi</p>
+
+  <div class="card">
+
+    <div class="visual">
+      <div class="dot-grid">
+        <div id="dot"></div>
+      </div>
+    </div>
+
+    <div class="servo-block">
+      <label>
+        Pan (vänster/höger)
+        <span id="pan-val">90°</span>
+      </label>
+      <input
+        type="range"
+        id="pan-slider"
+        min="0" max="180" value="90"
+        oninput="updateDisplay()"
+      />
+      <button class="center-btn" onclick="centerServo('pan')">Centrera</button>
+    </div>
+
+    <div class="servo-block">
+      <label>
+        Tilt (upp/ner)
+        <span id="tilt-val">90°</span>
+      </label>
+      <input
+        type="range"
+        id="tilt-slider"
+        min="0" max="180" value="90"
+        oninput="updateDisplay()"
+      />
+      <button class="center-btn" onclick="centerServo('tilt')">Centrera</button>
+    </div>
+
+    <hr class="divider" />
+
+    <button class="send-btn" onclick="sendCommand()">▶ SKICKA TILL SERVO</button>
+
+    <div id="status-msg">Redo att skicka...</div>
+  </div>
+
+  <script>
+    const panSlider  = document.getElementById("pan-slider");
+    const tiltSlider = document.getElementById("tilt-slider");
+    const panVal     = document.getElementById("pan-val");
+    const tiltVal    = document.getElementById("tilt-val");
+    const dot        = document.getElementById("dot");
+    const statusMsg  = document.getElementById("status-msg");
+
+    function updateDisplay() {
+      const pan  = parseInt(panSlider.value);
+      const tilt = parseInt(tiltSlider.value);
+
+      panVal.textContent  = pan  + "°";
+      tiltVal.textContent = tilt + "°";
+
+      const x = (pan  / 180) * 100;
+      const y = (tilt / 180) * 100;
+
+      dot.style.left = x + "%";
+      dot.style.top  = y + "%";
+    }
+
+    function centerServo(which) {
+      if (which === "pan")  panSlider.value  = 90;
+      if (which === "tilt") tiltSlider.value = 90;
+      updateDisplay();
+    }
+
+    async function sendCommand() {
+      const pan  = parseInt(panSlider.value);
+      const tilt = parseInt(tiltSlider.value);
+
+      statusMsg.textContent = "Skickar...";
+      statusMsg.className   = "";
+
+      try {
+        const response = await fetch("/move", {
+          method:  "POST",
+          headers: { "Content-Type": "application/json" },
+          body:    JSON.stringify({ pan: pan, tilt: tilt })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          statusMsg.textContent = `✓ Servos är på Pan: ${data.pan}°, Tilt: ${data.tilt}°`;
+          statusMsg.className   = "ok";
+        } else {
+          statusMsg.textContent = "✗ Servern svarade med fel!";
+          statusMsg.className   = "err";
+        }
+
+      } catch (error) {
+        statusMsg.textContent = "✗ Kunde inte nå servern. Är Pi igång?";
+        statusMsg.className   = "err";
+      }
+    }
+
+    updateDisplay();
+  </script>
+
+</body>
+</html>
